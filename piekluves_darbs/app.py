@@ -3,8 +3,9 @@ import sqlite3 as sql
 import hashlib
 
 class User:
-    def __init__(self, username, password):
-        self.username = username
+    def __init__(self, name, email, password):
+        self.name = name
+        self.email = email
         self.password = password
 
 class BusinessType:
@@ -24,63 +25,20 @@ class Transaction(Business):
         self.business_name = Business.business_name
         self.amount = amount
 
-# def hash_password(password):
-#     return hashlib.sha256(password.encode('utf-8')).hexdigest()  # Fixed hexdigest()
-
-# app = Flask(__name__, static_folder="static", template_folder="templates")
-# app.secret_key = "supersecretkey"
-
-# @app.route("/", methods=['GET', 'POST'])
-# def index():
-#     return render_template("index.html")
-
-# @app.route("/signup", methods=['GET', 'POST'])
-# def signup():
-#     if request.method == "POST":
-#         name = request.form.get('name')
-#         username = request.form.get('username')
-#         password = request.form.get('password')
-
-#         hashed_pw = hash_password(password)
-
-#         conn = sql.connect("expensify.db")
-#         cursor = conn.cursor()
-#         cursor.execute("INSERT INTO users (name, email, password) VALUES (?, ?, ?)", 
-#                        (name, username, hashed_pw))
-#         conn.commit()
-#         conn.close()
-
-#         return redirect(url_for("index"))
-
-#     return render_template("signup.html")
-
-# @app.route("/submit", methods=['GET', 'POST'])
-# def submit():
-#     username = request.form.get('username')
-#     password = request.form.get('password')
-
-#     print(username)
-#     print(password)
-#     print(hash_password(password))
-
-#     session["username"] = username  # Only store the username
-
-#     return redirect(url_for("dashboard"))
-
-# @app.route("/dashboard")
-# def dashboard():
-#     if "username" not in session:
-#         return redirect(url_for("index"))
-
-#     username = session.get("username")
-
-#     return render_template("dashboard.html", username=username)
-
-# if __name__ == "__main__":
-#     app.run(debug=True)
 
 def hash_password(password):
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+def get_all_users():
+    conn = sql.connect("expensify.db")
+    curr = conn.cursor()
+
+    curr.execute(""" SELECT * FROM users """)
+    data = curr.fetchall()
+
+    conn.close()
+
+    return data
 
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
@@ -88,47 +46,79 @@ app.secret_key = "supersecretkey"
 
 @app.route("/", methods=['GET', 'POST'])
 def index():
-    print("AAAAAAAAAA")
     return render_template("index.html")
 
 @app.route("/signup", methods=['GET', 'POST'])
 def signup():
+    return render_template("signup.html")
+    
+
+@app.route("/create_account", methods=['GET', 'POST'])
+def create_account():
+    is_registered = False
+    
     name = request.form.get('name')
     username = request.form.get('username')
-    password = request.form.get('password')
+    password = hash_password(request.form.get('password'))
+
+    users = get_all_users()
+    for user in users:
+        if user[2] == username:
+            is_registered = True
+
+
+    if not is_registered:
+        conn = sql.connect("expensify.db")
+        cursor = conn.cursor()
+
+        cursor.execute("""INSERT INTO users (name, email, password) VALUES (?,?,?)""", (name, username, password))
+
+        conn.commit()
+        conn.close()
+    else:
+        print("user already registered")
+        return render_template("signup.html", error="An account with this email already exists!")
+
+    return redirect(url_for("index"))
+    
 
 
 
 @app.route("/submit", methods=['GET', 'POST'])
 def submit():
-    print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+    login = False
     username = request.form.get('username')
-    password = request.form.get('password')
+    password = hash_password(request.form.get('password'))
 
-    session["username"] = username
-    session["password"] = password
+    users = get_all_users()
+    for user in users:
+        if user[2] == username and user[3] == password:
+            login = True
+            conn = sql.connect("expensify.db")
+            curr = conn.cursor()
 
-    print(username)
-    print(password)
-    print(hash_password(password))
+            curr.execute("""SELECT name FROM users WHERE email = ? AND password = ?""", (username, password))
+            name  = curr.fetchone()
 
-    return redirect(url_for("dashboard"))
+            print(name)
+            print(name[0])
+
+            session["name"] = name[0]
+
+            conn.close()
+
+            return redirect(url_for("dashboard"))
+        
+    if not login:    
+        return render_template("index.html", error="Wrong username or password")
+
+
+    
 
 @app.route("/dashboard")
 def dashboard():
-    print("SSSSAAAAAAAAA")
-    conn = sql.connect("expensify.db")
-    cursor = conn.cursor()
-
-    username = session.get("username")
-    password = session.get("password")
-
-    cursor.execute("""INSERT INTO users (name, email, password) VALUES (?,?,?)""", (username, username, password))
-
-    conn.commit()
-    conn.close()
-
-    return render_template("dashboard.html", username = username)
+    name = session["name"]
+    return render_template("dashboard.html", username = name)
 
 if __name__ == "__main__":
     app.run(debug=True)

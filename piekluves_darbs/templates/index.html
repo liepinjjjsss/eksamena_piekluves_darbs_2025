@@ -10,6 +10,9 @@
             <div class="card p-4 shadow-lg" style="width: 350px;">
                 <h2 class="text-center">Login</h2>
                 <form action="/submit" method="POST">
+                    {% if error %}
+                    <div class="alert alert-danger">{{ error }}</div>
+                    {% endif %}
                     <div class="mb-3">
                         <label for="email" class="form-label">Email</label>
                         <input type="email" class="form-control" id="email" name="username">
@@ -19,7 +22,7 @@
                         <input type="password" class="form-control" id="password" name="password">
                     </div>
                     <div class="mb-3 d-flex justify-content-center">
-                        <a href="/signup" style="color:#707070; font-size: 12px;">Dont have an account? Sign up</a>
+                        <a type="signup" href="/signup" style="color:#707070; font-size: 12px;">Dont have an account? Sign up</a>
                     </div>
                     <button type='submit' href="/dashboard"class="btn btn-primary w-100">Login</button>
                 </form>
