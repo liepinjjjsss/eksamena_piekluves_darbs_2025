@@ -111,6 +111,7 @@ def submit():
         
     if not login:    
         return render_template("index.html", error="Wrong username or password")
+    
 
 
     
@@ -119,6 +120,13 @@ def submit():
 def dashboard():
     name = session["name"]
     return render_template("dashboard.html", username = name)
+
+@app.route("/add_transaction", methods=['POST','GET'])
+def add_transaction():
+    amount = request.form.get("amount")
+    print(amount)
+
+    return dashboard()
 
 if __name__ == "__main__":
     app.run(debug=True)
