@@ -11,9 +11,9 @@
             <div class="row">
                 <!-- Sidebar -->
                 <nav class="col-md-3 col-lg-2 d-md-block text-white min-vh-100 p-3" style="background-color: #d9d9d9">
-                    <h2 class="h4">Dashboard</h2>
                     <ul class="nav flex-column">
-                        <li class="nav-item"><a href="#" class="nav-link text-white">Overview</a></li>
+                        <li class="nav-item"><a href="#" class="nav-link text-white"><h2 class="h4">Dashboard</h2></a></li>
+                        <li class="nav-item"><a href="/overview" class="nav-link text-white">Overview</a></li>
                         <li class="nav-item"><a href="#" class="nav-link text-white">Reports</a></li>
                         <li class="nav-item"><a href="#" class="nav-link text-white">Settings</a></li>
                     </ul>
@@ -23,16 +23,24 @@
                 <main class="col-md-9 col-lg-10 px-md-4 text-center" style="background-color: #707070;">
                     <h1 class="h3 mt-3">Welcome to the Dashboard {{ username }}</h1>
                     <p>Here you can view reports and manage finances.</p>
-                    <div class="col-lg-12 d-flex justify-content-center">
-                        <div class="card p-4 shadow-lg" style="width: 350px;">
+                    <div class="row">
+                        <div class="col-md-1"></div>
+                        <div class="card p-4 shadow-lg col-md-4" >
                             <form action="add_transaction" method="POST">
-                                <h2 class="text-center">add transaction</h2>
+                                <h2>add transaction</h2>
                                 <div class="mb-3">
-                                    <label for="amount" class="form-label">Amount</label>
+                                    <label for="amount" class="form-label text-start d-block">Amount</label>
                                     <input type="number" class="form-control" id="amount" name="amount">
-                                    <button type="add_transaction" class="btn btn-primary w-100" href="#">add transaction</button>
                                 </div>
+                                <div class="mb-3">
+                                    <label for="reciever" class="form-label text-start d-block">Reciever</label>
+                                    <input type="text" class="form-control" id="reciever" name="reciever">
+                                </div>
+                                <button type="add_transaction" class="btn btn-primary w-100" href="#">add transaction</button>
                             </form>                    
+                        </div>
+                        <div class="col-md-7">
+                            <p>empty div</p>
                         </div>
                     </div>
                 </main>
