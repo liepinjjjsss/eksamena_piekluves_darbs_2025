@@ -1,6 +1,9 @@
 from flask import *
 import sqlite3 as sql
 import hashlib
+import datetime as dt
+import matplotlib.pyplot as plt
+import numpy as np
 
 class User:
     def __init__(self, name, email, password):
@@ -39,6 +42,30 @@ def get_all_users():
     conn.close()
 
     return data
+
+def get_businesses(owner_id):
+    conn = sql.connect("expensify.db")
+    curr = conn.cursor()
+
+    curr.execute("""SELECT business_name FROM businesses WHERE owner_id=? """, (owner_id,))
+    data = curr.fetchall()
+
+    conn.close()
+
+    return [business[0] for business in data]
+
+def get_business_history(business_id):
+    conn = sql.connect("expensify.db")
+    curr = conn.cursor()
+
+    curr.execute("""SELECT timestamp, net_worth FROM business_history WHERE business_id = ? ORDER BY timestamp ASC""", (business_id,))
+    history = curr.fetchall()
+
+    conn.close()
+    
+    return history
+
+
 
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
@@ -110,6 +137,8 @@ def submit():
             session["name"] = name[0]
             session["user_id"] = id[0]
 
+            print(session["user_id"])
+
             conn.close()
 
             return redirect(url_for("dashboard"))
@@ -123,8 +152,12 @@ def submit():
 
 @app.route("/dashboard")
 def dashboard():
-    name = session["name"]
-    return render_template("dashboard.html", username = name)
+    name = session.get("name")
+    user_id = session.get("user_id")
+
+    businesses = get_businesses(session["user_id"])
+
+    return render_template("dashboard.html", username = name, businesses=businesses)
 
 @app.route("/overview")
 def overview():
@@ -134,14 +167,26 @@ def overview():
 @app.route("/add_transaction", methods=['POST','GET'])
 def add_transaction():
     amount = request.form.get("amount")
+    sender = request.form.get("sender")
     reciever = request.form.get("reciever")
+
     print(amount)
     print(reciever)
 
     conn = sql.connect("expensify.db")
     curr = conn.cursor()
 
-    curr.execute("""INSERT INTO transactions (user_id, amount, sender, reciever) VALUES (?,?,?,?)""", (session["user_id"], amount, session["name"], reciever))
+    curr.execute("""INSERT INTO transactions (user_id, amount, sender, reciever) VALUES (?,?,?,?)""", (session["user_id"], amount, sender, reciever))
+
+    curr.execute("""UPDATE businesses SET net_worth=net_worth+? WHERE business_name = ?""", (amount, sender))
+
+    curr.execute("""SELECT id FROM businesses WHERE business_name = ?""", (sender,))
+    business_id = curr.fetchone()
+
+    curr.execute("""SELECT net_worth FROM businesses WHERE business_name = ?""", (sender,))
+    net_worth = curr.fetchone()
+
+    curr.execute("""INSERT INTO business_history (business_id, net_worth) VALUES (?,?)""", (business_id[0], net_worth[0]))
 
     conn.commit()
     conn.close()

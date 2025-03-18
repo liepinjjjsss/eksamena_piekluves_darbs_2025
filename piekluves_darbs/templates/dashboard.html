@@ -33,6 +33,15 @@
                                     <input type="number" class="form-control" id="amount" name="amount">
                                 </div>
                                 <div class="mb-3">
+                                    <label for="sender" class="form-label text-start d-block">Sender</label>
+                                    <input list="businesses" type="text" class="form-control" id="sender" name="sender">
+                                    <datalist id="businesses">
+                                        {% for business in businesses %}
+                                        <option value="{{ business }}"></option>
+                                        {% endfor %}
+                                    </datalist>
+                                </div>
+                                <div class="mb-3">
                                     <label for="reciever" class="form-label text-start d-block">Reciever</label>
                                     <input type="text" class="form-control" id="reciever" name="reciever">
                                 </div>
