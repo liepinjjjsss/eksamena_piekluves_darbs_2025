@@ -4,12 +4,70 @@ import hashlib
 import datetime as dt
 import matplotlib.pyplot as plt
 import numpy as np
+import uuid
+
+class Database:
+    def __init__(self, db_name="name.db"):
+        self.db_name = db_name
+
+    def execute(self, query, params=(), fetchone=False, fetchall=False, commit=True):
+        conn = sql.connect(self.db_name)
+        curr = conn.cursor()
+
+        curr.execute(query, params)
+
+        data = None
+
+        if fetchone:
+            data = curr.fetchone()
+        elif fetchall:
+            data = curr.fetchall()
+
+        if commit:
+            conn.commit()
+        conn.close()
+
+        return data
+    
+db = Database("expensify.db")
+    
 
 class User:
-    def __init__(self, name, email, password):
+    def __init__(self, id, name, email, password):
+        self.id = id
         self.name = name
         self.email = email
         self.password = password
+
+    def hash_password(self, password):
+        return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+    def create(self, cls,  name, email, password):
+        user_id = str(uuid.uuid4())
+        hashed_password = self.hash_password(password)
+
+        db.execute("INSERT INTO users (id, name, email, password) VALUES (?,?,?,?)", (user_id, name, email, password), commit=True)
+
+        return cls(user_id, name, email, hashed_password)
+    
+    def get_user_by_email(cls, email):
+        user_data = db.execute("SELECT * FROM users WHERE email=?", (email,), fetchone=True, commit=True)
+
+        if user_data:
+            return cls(*user_data)
+        else:
+            return None
+        
+    def get_user_by_id(cls, id):
+        user_data = db.execute("SELECT * FROM users WHERE id=?", (id,), fetchone=True, commit=True)
+        if user_data:
+            return cls(*user_data)
+        else:
+            return None
+    
+    def check_password(self, password):
+        return self.password == self.hash_password(password)
+
 
 class BusinessType:
     def __init__(self, id, business_type, tax):
@@ -18,19 +76,27 @@ class BusinessType:
         self.tax = tax
 
 class Business(BusinessType):
-    def __init__(self, business_name, net_worth):
-        self.business_type = BusinessType.business_type
+    def __init__(self, id, business_type, business_name, net_worth, owner):
+        self.id = id
+        self.business_type = business_type
         self.business_name = business_name
         self.net_worth = net_worth
+        self.owner = owner
+
+    def get_by_owner(cls, owner_id):
+
+        businesses = db.execute("SELECT * FROM businesses WHERE owner_id=?", (owner_id,), fetchall=True)
+        if businesses:
+            return [cls(*business) for business in businesses]
+        else:
+            return []
 
 class Transaction(Business):
-    def __init__(self, amount):
+    def __init__(self, id, amount):
         self.business_name = Business.business_name
+        self.id = id
         self.amount = amount
 
-
-def hash_password(password):
-    return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
 def get_all_users():
     conn = sql.connect("expensify.db")
@@ -81,30 +147,17 @@ def signup():
     
 
 @app.route("/create_account", methods=['GET', 'POST'])
-def create_account():
-    is_registered = False
+def create_account():    
+    name = request.form.get("name")
+    email = request.form.get("username")
+    password = request.form.get("password")
+
+    if User.get_user_by_email(email):
+        return render_template("signup.html", error="Email already in use")
     
-    name = request.form.get('name')
-    username = request.form.get('username')
-    password = hash_password(request.form.get('password'))
+    user = User.create(name, email, password)
 
-    users = get_all_users()
-    for user in users:
-        if user[2] == username:
-            is_registered = True
-
-
-    if not is_registered:
-        conn = sql.connect("expensify.db")
-        cursor = conn.cursor()
-
-        cursor.execute("""INSERT INTO users (name, email, password) VALUES (?,?,?)""", (name, username, password))
-
-        conn.commit()
-        conn.close()
-    else:
-        print("user already registered")
-        return render_template("signup.html", error="An account with this email already exists!")
+    session["user_id"] = user.id
 
     return redirect(url_for("index"))
     
@@ -113,37 +166,15 @@ def create_account():
 
 @app.route("/submit", methods=['GET', 'POST'])
 def submit():
-    login = False
-    username = request.form.get('username')
-    password = hash_password(request.form.get('password'))
+    email = request.form.get('username')
+    password = request.form.get('password')
 
-    users = get_all_users()
-    for user in users:
-        if user[2] == username and user[3] == password:
-            login = True
-            conn = sql.connect("expensify.db")
-            curr = conn.cursor()
+    user = User.get_user_by_email(User, email)
 
-            curr.execute("""SELECT name FROM users WHERE email = ? AND password = ?""", (username, password))
-            name  = curr.fetchone()
-
-            curr.execute("""SELECT id FROM users WHERE email = ? AND password = ?""", (username, password))
-            id = curr.fetchone()
-
-
-            print(name)
-            print(id)
-
-            session["name"] = name[0]
-            session["user_id"] = id[0]
-
-            print(session["user_id"])
-
-            conn.close()
-
-            return redirect(url_for("dashboard"))
-        
-    if not login:    
+    if user and user.check_password(password):
+        session["user_id"] = user.id
+        return redirect(url_for("dashboard"))
+    else:
         return render_template("index.html", error="Wrong username or password")
     
 
@@ -152,12 +183,13 @@ def submit():
 
 @app.route("/dashboard")
 def dashboard():
-    name = session.get("name")
-    user_id = session.get("user_id")
+    user_id = session["user_id"]
 
-    businesses = get_businesses(session["user_id"])
+    name = User.get_user_by_id(User, user_id).name
 
-    return render_template("dashboard.html", username = name, businesses=businesses)
+    businesses = Business.get_by_owner(Business, user_id)
+
+    return render_template("dashboard.html", username = name, businesses = businesses)
 
 @app.route("/overview")
 def overview():
@@ -166,6 +198,7 @@ def overview():
 
 @app.route("/add_transaction", methods=['POST','GET'])
 def add_transaction():
+    
     amount = request.form.get("amount")
     sender = request.form.get("sender")
     reciever = request.form.get("reciever")
