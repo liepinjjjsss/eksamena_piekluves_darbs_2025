@@ -92,10 +92,16 @@ class Business(BusinessType):
             return []
 
 class Transaction(Business):
-    def __init__(self, id, amount):
-        self.business_name = Business.business_name
+    def __init__(self, id, amount, sender, reciever): 
         self.id = id
         self.amount = amount
+        self.sender = sender
+        self.reciever = reciever
+
+    def create(cls, user_id, amount, sender, reciever):
+        id = uuid.uuid4()
+        db.execute("INSERT INTO transactions (id, user_id, amount, sender, reciever) VALUES (?,?,?,?,?)", (id, user_id, amount, sender, reciever))
+
 
 
 def get_all_users():
@@ -193,38 +199,31 @@ def dashboard():
 
 @app.route("/overview")
 def overview():
-    name = session["name"]
+    user_id = session["user_id"]
+
+    name = User.get_user_by_id(User, user_id).name
+
     return render_template("overview.html", username = name)
+    
 
 @app.route("/add_transaction", methods=['POST','GET'])
 def add_transaction():
-    
+    user_id = session["user_id"]
     amount = request.form.get("amount")
     sender = request.form.get("sender")
     reciever = request.form.get("reciever")
 
-    print(amount)
-    print(reciever)
+    transaction = Transaction.create(user_id, amount, sender, reciever)
 
-    conn = sql.connect("expensify.db")
-    curr = conn.cursor()
+    db.execute("""UPDATE businesses SET net_worth=net_worth+? WHERE business_name = ?""", (amount, sender))
 
-    curr.execute("""INSERT INTO transactions (user_id, amount, sender, reciever) VALUES (?,?,?,?)""", (session["user_id"], amount, sender, reciever))
+    business_id = db.execute("""SELECT id FROM businesses WHERE business_name = ?""", (sender,), fetchone=True)
 
-    curr.execute("""UPDATE businesses SET net_worth=net_worth+? WHERE business_name = ?""", (amount, sender))
+    net_worth = db.execute("""SELECT net_worth FROM businesses WHERE business_name = ?""", (sender,), fetchone=True)
 
-    curr.execute("""SELECT id FROM businesses WHERE business_name = ?""", (sender,))
-    business_id = curr.fetchone()
+    db.execute("""INSERT INTO business_history (business_id, net_worth) VALUES (?,?)""", (business_id[0], net_worth[0]))
 
-    curr.execute("""SELECT net_worth FROM businesses WHERE business_name = ?""", (sender,))
-    net_worth = curr.fetchone()
-
-    curr.execute("""INSERT INTO business_history (business_id, net_worth) VALUES (?,?)""", (business_id[0], net_worth[0]))
-
-    conn.commit()
-    conn.close()
-
-    return dashboard()
+    return redirect(url_for("dashboard"))
 
 @app.route("/add_business", methods=['POST', 'GET'])
 def add_business():
