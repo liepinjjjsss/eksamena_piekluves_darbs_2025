@@ -5,6 +5,7 @@ import datetime as dt
 import matplotlib.pyplot as plt
 import numpy as np
 import uuid
+import io
 
 class Database:
     def __init__(self, db_name="name.db"):
@@ -90,6 +91,13 @@ class Business(BusinessType):
             return [cls(*business) for business in businesses]
         else:
             return []
+        
+
+        
+
+
+
+        
 
 class Transaction(Business):
     def __init__(self, id, amount, sender, reciever): 
@@ -101,6 +109,8 @@ class Transaction(Business):
     def create(cls, user_id, amount, sender, reciever):
         id = uuid.uuid4()
         db.execute("INSERT INTO transactions (id, user_id, amount, sender, reciever) VALUES (?,?,?,?,?)", (id, user_id, amount, sender, reciever))
+
+
 
 
 
@@ -193,9 +203,37 @@ def dashboard():
 
     name = User.get_user_by_id(User, user_id).name
 
-    businesses = Business.get_by_owner(Business, user_id)
+    data = Business.get_by_owner(Business, user_id)
+    businesses = []
+    for business in data:
+        businesses.append(business.business_name)
+
+    print(businesses)
+    
+
+
 
     return render_template("dashboard.html", username = name, businesses = businesses)
+
+# @app.route("/plot")
+# def plot_history():
+#     pass
+#     data = db.execute("SELECT timestamp, net_worth FROM business_history WHERE business_id=?", (business_id,), fetchall=True)
+#     x = []
+#     y = []
+
+#     for tuple in data:
+#         x.append(tuple[0])
+#         y.append(tuple[1])
+    
+#     fig, ax = plt.subplots()
+#     ax.plot(x, y)
+    
+#     buf = io.BytesIO()
+#     fig.savefig(buf, format='png')
+#     buf.seek(0)
+    
+#     return send_file(buf, mimetype='image/png')
 
 @app.route("/overview")
 def overview():
