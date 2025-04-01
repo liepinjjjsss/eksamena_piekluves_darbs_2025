@@ -2,10 +2,13 @@ from flask import *
 import sqlite3 as sql
 import hashlib
 import datetime as dt
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import uuid
 import io
+
+matplotlib.use('Agg')
 
 class Database:
     def __init__(self, db_name="name.db"):
@@ -92,11 +95,13 @@ class Business(BusinessType):
         else:
             return []
         
+    def get_by_name(cls, name, owner_id):
+        business = db.execute("SELECT * FROM businesses WHERE business_name=? AND owner_id=?", (name, owner_id), fetchone=True)
 
-        
-
-
-
+        if business: 
+            return cls(*business)
+        else:
+            return None
         
 
 class Transaction(Business):
@@ -215,25 +220,32 @@ def dashboard():
 
     return render_template("dashboard.html", username = name, businesses = businesses)
 
-# @app.route("/plot")
-# def plot_history():
-#     pass
-#     data = db.execute("SELECT timestamp, net_worth FROM business_history WHERE business_id=?", (business_id,), fetchall=True)
-#     x = []
-#     y = []
+@app.route("/plot")
+def plot_history():
+    business = request.form.get("business-graph")
+    user_id = session["user_id"]
 
-#     for tuple in data:
-#         x.append(tuple[0])
-#         y.append(tuple[1])
+    width = int(request.args.get("w", 600))
+    height = int(request.args.get("h",400))
+
+    business_id = Business.get_by_name(Business, business, user_id)
+
+    data = db.execute("SELECT timestamp, net_worth FROM business_history WHERE business_id=?", (business_id,), fetchall=True)
+    x = []
+    y = []
+
+    for tuple in data:
+        x.append(tuple[0])
+        y.append(tuple[1])
     
-#     fig, ax = plt.subplots()
-#     ax.plot(x, y)
+    fig, ax = plt.subplots(figsize=(width/100, height/100))
+    ax.plot(x, y)
     
-#     buf = io.BytesIO()
-#     fig.savefig(buf, format='png')
-#     buf.seek(0)
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', bbox_inches="tight")
+    buf.seek(0)
     
-#     return send_file(buf, mimetype='image/png')
+    return send_file(buf, mimetype='image/png')
 
 @app.route("/overview")
 def overview():
