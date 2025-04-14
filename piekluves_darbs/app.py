@@ -107,8 +107,11 @@ class Transaction(Business):
         self.reciever = reciever
 
     def create(cls, user_id, amount, sender, reciever):
-        id = uuid.uuid4()
-        db.execute("INSERT INTO transactions (id, user_id, amount, sender, reciever) VALUES (?,?,?,?,?)", (id, user_id, amount, sender, reciever))
+        id = str(uuid.uuid4())
+        db.execute("INSERT INTO transactions (id, user_id, amount, sender, reciever) VALUES (?,?,?,?,?)", (str(id), user_id, amount, sender, reciever))
+        return cls(str(id), amount, sender, reciever)
+
+
 
 
 
@@ -215,25 +218,54 @@ def dashboard():
 
     return render_template("dashboard.html", username = name, businesses = businesses)
 
+@app.route("/get_business_data", methods=["GET", "POST"])
+def get_business_data():
+    if request.method =="POST":
+        business_name = request.form.get("business_name")
+        print(business_name)
+        if business_name:
+            business_id = db.execute("SELECT id FROM businesses WHERE business_name=?", (business_name,), fetchone=True)
+            if business_id:
+                data = db.execute("SELECT timestamp, net_worth FROM business_history WHERE business_id=?", (business_id[0],), fetchall=True)
+                x = []
+                y = []
+
+                for business in data:
+                    x.append(business[0])
+                    y.append(business[1])
+                # Generate the plot
+                
+                
+                # Create the figure
+                fig, ax = plt.subplots(figsize=(6, 4))  # Size can be adjusted
+                ax.plot(x, y)
+
+                # Save plot to a buffer
+                buf = io.BytesIO()
+                fig.savefig(buf, format='png', bbox_inches="tight")
+                buf.seek(0)
+
+                # Generate the plot URL (e.g., a URL for the image)
+                plot_url = '/static/plot_image'
+                with open(f"static/plot_image.png", "wb") as f:
+                    f.write(buf.read())  # Write the image buffer to a file
+
+                return render_template("dashboard.html", plot_url=plot_url)
+            
+        return "no data found"
+    
+    return render_template("dashboard.html")
+
 # @app.route("/plot")
 # def plot_history():
-#     pass
-#     data = db.execute("SELECT timestamp, net_worth FROM business_history WHERE business_id=?", (business_id,), fetchall=True)
-#     x = []
-#     y = []
-
-#     for tuple in data:
-#         x.append(tuple[0])
-#         y.append(tuple[1])
-    
-#     fig, ax = plt.subplots()
-#     ax.plot(x, y)
-    
 #     buf = io.BytesIO()
-#     fig.savefig(buf, format='png')
+#     fig, ax = plt.subplots(figsize=(6, 4))
+#     ax.plot([1, 2, 3], [4, 5, 6])
+#     fig.savefig(buf, format="png")
 #     buf.seek(0)
+
+#     return send_file(buf, mimetype="image/png")
     
-#     return send_file(buf, mimetype='image/png')
 
 @app.route("/overview")
 def overview():
@@ -251,7 +283,7 @@ def add_transaction():
     sender = request.form.get("sender")
     reciever = request.form.get("reciever")
 
-    transaction = Transaction.create(user_id, amount, sender, reciever)
+    transaction = Transaction.create(cls=Transaction, user_id=user_id, amount=amount, sender=sender, reciever=reciever)
 
     db.execute("""UPDATE businesses SET net_worth=net_worth+? WHERE business_name = ?""", (amount, sender))
 
@@ -260,6 +292,8 @@ def add_transaction():
     net_worth = db.execute("""SELECT net_worth FROM businesses WHERE business_name = ?""", (sender,), fetchone=True)
 
     db.execute("""INSERT INTO business_history (business_id, net_worth) VALUES (?,?)""", (business_id[0], net_worth[0]))
+
+    print("transaction added!")
 
     return redirect(url_for("dashboard"))
 

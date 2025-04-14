@@ -49,23 +49,48 @@
                             </form>                    
                         </div>
                         <div class="col-md-1"></div>
-                        <div class="card p-4 shadow-lg col-md-5">
-                            <div class="mb-4">
-                                <label for="sender" class="form-label text-start d-block">Business</label>
-                                <input list="businesses" type="text" class="form-control" id="sender" name="sender">
-                                    <datalist id="businesses">
-                                        {% for business in businesses %}
-                                        <option value="{{ business }}"></option>
-                                        {% endfor %}
-                                    </datalist>
-                            </div>
+                            <div class="card p-4 shadow-lg col-md-5">
+                                <div class="mb-4">
+                                    <form method="POST" action="/get_business_data">
+                                        <label for="business_name" class="form-label text-start d-block">Business</label>
+                                        <input list="businesses" type="text" class="form-control" id="business_name" name="business_name">
+                                        <datalist id="businesses">
+                                            {% for business in businesses %}
+                                                <option value="{{ business }}"></option>
+                                            {% endfor %}
+                                        </datalist>
+                                        <button type="submit" class="btn btn-primary w-100">View!</button>
+                                    </form>
+                                </div>
 
-                        </div>
+                                {% if plot_url %}
+                                    <div id="plot-container">
+                                        <img src="/static/plot_image.png" alt="Plot Image" style="width: 100%; max-width: 600px;">
+                                    </div>
+                                {% endif %}
+                            </div>
                         <div class="col-md-1"></div>
                     </div>
                 </main>
             </div>
         </div>
     </body>
-    
-    </html>
+    <script>
+        function updatePlot() {
+            let div = document.querySelector(".card.col-md-5");  // Target div
+            let img = document.querySelector("#plot-img");  // The plot image
+        
+            let width = div.clientWidth;  // Get div width
+            let height = div.clientHeight; // Get div height
+        
+            // Set new image URL with dimensions
+            img.src = `/plot?w=${width}&h=${height}&t=${new Date().getTime()}`; // Add timestamp to avoid caching
+        }
+        
+        // Call updatePlot on window resize
+        window.addEventListener("resize", updatePlot);
+        
+        // Call it once on page load
+        window.addEventListener("load", updatePlot);
+    </script>
+</html>
