@@ -2,10 +2,13 @@ from flask import *
 import sqlite3 as sql
 import hashlib
 import datetime as dt
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import uuid
 import io
+
+matplotlib.use('Agg')
 
 class Database:
     def __init__(self, db_name="name.db"):
@@ -92,11 +95,13 @@ class Business(BusinessType):
         else:
             return []
         
+    def get_by_name(cls, name, owner_id):
+        business = db.execute("SELECT * FROM businesses WHERE business_name=? AND owner_id=?", (name, owner_id), fetchone=True)
 
-        
-
-
-
+        if business: 
+            return cls(*business)
+        else:
+            return None
         
 
 class Transaction(Business):
