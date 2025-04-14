@@ -197,9 +197,6 @@ def submit():
         return render_template("index.html", error="Wrong username or password")
     
 
-
-    
-
 @app.route("/dashboard")
 def dashboard():
     user_id = session["user_id"]
@@ -213,9 +210,6 @@ def dashboard():
 
     print(businesses)
     
-
-
-
     return render_template("dashboard.html", username = name, businesses = businesses)
 
 @app.route("/get_business_data", methods=["GET", "POST"])
