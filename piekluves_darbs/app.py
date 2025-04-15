@@ -1,9 +1,11 @@
 from flask import *
 import sqlite3 as sql
 import hashlib
-import datetime as dt
+from datetime import datetime as dt
+import time
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import numpy as np
 import uuid
 import io
@@ -214,8 +216,9 @@ def dashboard():
         businesses.append(business.business_name)
 
     print(businesses)
+    timestamp = request.args.get("t", int(time.time() * 1000))
     
-    return render_template("dashboard.html", username = name, businesses = businesses)
+    return render_template("dashboard.html", username = name, businesses = businesses, timestamp=timestamp)
 
 @app.route("/get_business_data", methods=["GET", "POST"])
 def get_business_data():
@@ -237,7 +240,11 @@ def get_business_data():
                 
                 # Create the figure
                 fig, ax = plt.subplots(figsize=(6, 4))  # Size can be adjusted
+                
                 ax.plot(x, y)
+                ax.set_title(f"Net worth over time - {business_name}")
+                fig.autofmt_xdate()
+
 
                 # Save plot to a buffer
                 buf = io.BytesIO()
@@ -284,17 +291,20 @@ def add_transaction():
 
     transaction = Transaction.create(cls=Transaction, user_id=user_id, amount=amount, sender=sender, reciever=reciever)
 
-    db.execute("""UPDATE businesses SET net_worth=net_worth+? WHERE business_name = ?""", (amount, sender))
-
-    business_id = db.execute("""SELECT id FROM businesses WHERE business_name = ?""", (sender,), fetchone=True)
-
+    db.execute("""UPDATE businesses SET net_worth=net_worth-? WHERE business_name = ?""", (amount, sender))
+    sender_id = db.execute("""SELECT id FROM businesses WHERE business_name = ?""", (sender,), fetchone=True)
     net_worth = db.execute("""SELECT net_worth FROM businesses WHERE business_name = ?""", (sender,), fetchone=True)
+    db.execute("""INSERT INTO business_history (business_id, net_worth) VALUES (?,?)""", (sender_id[0], net_worth[0]))
 
-    db.execute("""INSERT INTO business_history (business_id, net_worth) VALUES (?,?)""", (business_id[0], net_worth[0]))
+    reciever_id = db.execute("""SELECT id FROM businesses WHERE business_name = ?""", (reciever,), fetchone=True)
+
+
 
     print("transaction added!")
 
-    return redirect(url_for("dashboard"))
+    timestamp = int(time.time()*1000)
+
+    return redirect(url_for("dashboard", t = timestamp))
 
 @app.route("/add_business", methods=['POST', 'GET'])
 def add_business():
