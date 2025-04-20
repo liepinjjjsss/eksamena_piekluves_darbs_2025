@@ -13,16 +13,13 @@
                 <nav class="col-md-3 col-lg-2 d-md-block text-white min-vh-100 p-3" style="background-color: #d9d9d9">
                     <ul class="nav flex-column">
                         <li class="nav-item"><a href="/dashboard" class="nav-link text-white">Dashboard</a></li>
-                        <li class="nav-item"><a href="#" class="nav-link text-white"><h2 class="h4">Overview</h2></a></li>
-                        <li class="nav-item"><a href="#" class="nav-link text-white">Reports</a></li>
-                        <li class="nav-item"><a href="#" class="nav-link text-white">Settings</a></li>
+                        <li class="nav-item"><a href="#" class="nav-link text-white"><h2 class="h4">Businesses</h2></a></li>
                     </ul>
                 </nav>
     
                 <!-- Main Content -->
                 <main class="col-md-9 col-lg-10 px-md-4 text-center" style="background-color: #707070;">
-                    <h1 class="h3 mt-3">Welcome to the Dashboard {{ username }}</h1>
-                    <p>Here you can view reports and manage finances.</p>   
+                    <h1 class="h3 mt-3">Welcome to Expensify, {{ username }}!</h1>   
                     <div class="row">
                         <div class="col-md-1"></div>
                         <div class="card p-4 shadow-lg col-md-4" >
@@ -30,11 +27,19 @@
                                 <h2>add business</h2>
                                 <div class="mb-3">
                                     <label for="business_name" class="form-label text-start d-block">name</label>
-                                    <input type="text" class="form-control" id="business_name" name="business_name">
+                                    <input type="text" class="form-control" id="business_name" name="business_name" required>
                                 </div>
                                 <div class="mb-3">
                                     <label for="business_type" class="form-label text-start d-block">type</label>
-                                    <input type="text" class="form-control" id="business_type" name="business_type" >
+                                    <select id="business_type" name="business_type" class="form-control" required>
+                                        <option value="" disabled selected>Select business type</option>
+                                        <option value="SIA">SIA (Sabiedrība ar Ierobežotu Atbildību)</option>
+                                        <option value="AS">AS (Akciju Sabiedrība)</option>
+                                        <option value="IK">IK (Individuālais Komersants)</option>
+                                        <option value="ZS">Z/S (Zemnieku saimniecība)</option>
+                                        <option value="Biedriba">Biedrība / Nodibinājums</option>
+                                        <option value="SelfEmployed">Pašnodarbināta persona</option>
+                                      </select>
                                 </div>
                                 <div class="mb-3">
                                     <label for="net_worth" class="form-label text-start d-block">net worth</label>
@@ -42,9 +47,6 @@
                                 </div>
                                 <button type="add_business" class="btn btn-primary w-100" href="#">add business</button>
                             </form>                    
-                        </div>
-                        <div class="col-md-7">
-                            <p>empty div</p>
                         </div>
                     </div>
                 </main>

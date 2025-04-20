@@ -2,13 +2,14 @@ from flask import *
 import sqlite3 as sql
 import hashlib
 from datetime import datetime as dt
-import time
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import numpy as np
 import uuid
 import io
+import requests
+import os
 
 matplotlib.use('Agg')
 
@@ -48,11 +49,11 @@ class User:
     def hash_password(self, password):
         return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
-    def create(self, cls,  name, email, password):
+    def create(cls, name, email, password):
         user_id = str(uuid.uuid4())
-        hashed_password = self.hash_password(password)
+        hashed_password = hashlib.sha256(password.encode('utf-8')).hexdigest()
 
-        db.execute("INSERT INTO users (id, name, email, password) VALUES (?,?,?,?)", (user_id, name, email, password), commit=True)
+        db.execute("INSERT INTO users (id, name, email, password) VALUES (?,?,?,?)", (user_id, name, email, hashed_password), commit=True)
 
         return cls(user_id, name, email, hashed_password)
     
@@ -82,12 +83,18 @@ class BusinessType:
         self.tax = tax
 
 class Business(BusinessType):
-    def __init__(self, id, business_type, business_name, net_worth, owner):
+    def __init__(self, id, owner, business_name, business_type, net_worth):
         self.id = id
-        self.business_type = business_type
-        self.business_name = business_name
-        self.net_worth = net_worth
         self.owner = owner
+        self.business_name = business_name
+        self.business_type = business_type
+        self.net_worth = net_worth
+        
+
+    def create(cls, owner_id, business_type, business_name, net_worth):
+        id = str(uuid.uuid4())
+        db.execute("""INSERT INTO businesses (id, owner_id, business_name, business_type, net_worth) VALUES (?,?,?,?,?)""", (id, owner_id, business_name, business_type, net_worth))
+        return cls(id, owner_id, business_type, business_name, net_worth)
 
     def get_by_owner(cls, owner_id):
 
@@ -115,13 +122,8 @@ class Transaction(Business):
 
     def create(cls, user_id, amount, sender, reciever):
         id = str(uuid.uuid4())
-        db.execute("INSERT INTO transactions (id, user_id, amount, sender, reciever) VALUES (?,?,?,?,?)", (str(id), user_id, amount, sender, reciever))
-        return cls(str(id), amount, sender, reciever)
-
-
-
-
-
+        db.execute("INSERT INTO transactions (id, user_id, amount, sender, reciever) VALUES (?,?,?,?,?)", (id, user_id, amount, sender, reciever))
+        return cls(id, amount, sender, reciever)
 
 
 def get_all_users():
@@ -178,10 +180,10 @@ def create_account():
     email = request.form.get("username")
     password = request.form.get("password")
 
-    if User.get_user_by_email(email):
+    if User.get_user_by_email(User, email):
         return render_template("signup.html", error="Email already in use")
     
-    user = User.create(name, email, password)
+    user = User.create(User, name, email, password)
 
     session["user_id"] = user.id
 
@@ -207,6 +209,16 @@ def submit():
 @app.route("/dashboard")
 def dashboard():
     user_id = session["user_id"]
+    api_url = "https://api.api-ninjas.com/v1/facts"
+    response = requests.get(api_url, headers={'X-Api-Key': 'k96d+MICigaE3Jrx6iAoVw==jzOdUIjbyAEXw5Yw'})
+    if response.status_code == requests.codes.ok:
+        print(f"Fact of the day: {response.json()[0]['fact']}")
+        fact = f"Fact of the day: {response.json()[0]["fact"]}"
+    else:
+        print(f"Error: {response.status_code} {response.text}")
+        fact = f"Error: {response.status_code} {response.text}"
+
+
 
     name = User.get_user_by_id(User, user_id).name
 
@@ -215,18 +227,26 @@ def dashboard():
     for business in data:
         businesses.append(business.business_name)
 
+    has_businesses = len(businesses) > 0
+
     print(businesses)
-    timestamp = request.args.get("t", int(time.time() * 1000))
     
-    return render_template("dashboard.html", username = name, businesses = businesses, timestamp=timestamp)
+    transaction_error = request.args.get("transaction_error")
+
+    plot_filename = request.args.get("plot_filename")
+
+    plot_error = request.args.get("plot_error")
+    
+    return render_template("dashboard.html", username = name, businesses = businesses, has_businesses=has_businesses, transaction_error=transaction_error, api_text = fact, plot_filename=plot_filename, plot_error=plot_error)
 
 @app.route("/get_business_data", methods=["GET", "POST"])
 def get_business_data():
+    user_id = session["user_id"]
     if request.method =="POST":
         business_name = request.form.get("business_name")
         print(business_name)
         if business_name:
-            business_id = db.execute("SELECT id FROM businesses WHERE business_name=?", (business_name,), fetchone=True)
+            business_id = db.execute("SELECT id FROM businesses WHERE business_name=? AND owner_id=?", (business_name, user_id), fetchone=True)
             if business_id:
                 data = db.execute("SELECT timestamp, net_worth FROM business_history WHERE business_id=?", (business_id[0],), fetchall=True)
                 x = []
@@ -235,43 +255,22 @@ def get_business_data():
                 for business in data:
                     x.append(business[0])
                     y.append(business[1])
-                # Generate the plot
-                
-                
-                # Create the figure
-                fig, ax = plt.subplots(figsize=(6, 4))  # Size can be adjusted
+
+                fig, ax = plt.subplots(figsize=(6, 4))
                 
                 ax.plot(x, y)
                 ax.set_title(f"Net worth over time - {business_name}")
                 fig.autofmt_xdate()
 
+                filename = f"plot_{user_id}_{business_id[0]}.png"
+                filepath = os.path.join("static", filename)
+                fig.savefig(filepath)
 
-                # Save plot to a buffer
-                buf = io.BytesIO()
-                fig.savefig(buf, format='png', bbox_inches="tight")
-                buf.seek(0)
-
-                # Generate the plot URL (e.g., a URL for the image)
-                plot_url = '/static/plot_image'
-                with open(f"static/plot_image.png", "wb") as f:
-                    f.write(buf.read())  # Write the image buffer to a file
-
-                return render_template("dashboard.html", plot_url=plot_url)
+                return redirect(url_for("dashboard", plot_filename=filename))
             
-        return "no data found"
+        return redirect(url_for("dashboard", plot_error="No such business was found"))
     
-    return render_template("dashboard.html")
-
-# @app.route("/plot")
-# def plot_history():
-#     buf = io.BytesIO()
-#     fig, ax = plt.subplots(figsize=(6, 4))
-#     ax.plot([1, 2, 3], [4, 5, 6])
-#     fig.savefig(buf, format="png")
-#     buf.seek(0)
-
-#     return send_file(buf, mimetype="image/png")
-    
+    return redirect(url_for("dashboard"))
 
 @app.route("/overview")
 def overview():
@@ -285,26 +284,44 @@ def overview():
 @app.route("/add_transaction", methods=['POST','GET'])
 def add_transaction():
     user_id = session["user_id"]
-    amount = request.form.get("amount")
+    amount = float(request.form.get("amount"))
     sender = request.form.get("sender")
     reciever = request.form.get("reciever")
 
-    transaction = Transaction.create(cls=Transaction, user_id=user_id, amount=amount, sender=sender, reciever=reciever)
-
-    db.execute("""UPDATE businesses SET net_worth=net_worth-? WHERE business_name = ?""", (amount, sender))
-    sender_id = db.execute("""SELECT id FROM businesses WHERE business_name = ?""", (sender,), fetchone=True)
-    net_worth = db.execute("""SELECT net_worth FROM businesses WHERE business_name = ?""", (sender,), fetchone=True)
-    db.execute("""INSERT INTO business_history (business_id, net_worth) VALUES (?,?)""", (sender_id[0], net_worth[0]))
-
-    reciever_id = db.execute("""SELECT id FROM businesses WHERE business_name = ?""", (reciever,), fetchone=True)
+    sender_id = db.execute("""SELECT id FROM businesses WHERE business_name = ? AND owner_id=?""", (sender, user_id), fetchone=True)
+    reciever_id = db.execute("""SELECT id FROM businesses WHERE business_name = ? AND owner_id=?""", (reciever, user_id), fetchone=True)
 
 
+    if sender_id and reciever_id:
+        sender_net_worth = db.execute("""SELECT net_worth FROM businesses WHERE id=?""", (sender_id[0],), fetchone=True)
+        if  amount >= 0:          
+            if (sender_net_worth[0]-amount) > 0:
+                Transaction.create(cls=Transaction, user_id=user_id, amount=amount, sender=sender_id[0], reciever=reciever_id[0])
+                
+                db.execute("""UPDATE businesses SET net_worth=net_worth-? WHERE id=?""", (amount, sender_id[0]))
+                db.execute("""UPDATE businesses SET net_worth=net_worth+? WHERE id=?""", (amount, reciever_id[0]))
 
-    print("transaction added!")
+                sender_net_worth = db.execute("""SELECT net_worth FROM businesses WHERE id=?""", (sender_id[0],), fetchone=True)
+                db.execute("""INSERT INTO business_history (id, business_id, net_worth) VALUES (?,?,?)""", (str(uuid.uuid4()), sender_id[0], sender_net_worth[0]))
 
-    timestamp = int(time.time()*1000)
+                reciever_net_worth = db.execute("""SELECT net_worth FROM businesses WHERE id=?""", (reciever_id[0],), fetchone=True)
+                db.execute("""INSERT INTO business_history (id, business_id, net_worth) VALUES (?,?,?)""", (str(uuid.uuid4()), reciever_id[0], reciever_net_worth[0]))
 
-    return redirect(url_for("dashboard", t = timestamp))
+                print("transaction added!")
+                
+                return redirect(url_for("dashboard"))
+            
+            else:
+                return redirect(url_for("dashboard", transaction_error = "Not enough funds!"))
+            
+        else:
+            return redirect(url_for("dashboard", transaction_error = "Can't send negative amount of money"))
+        
+    else:
+        return redirect(url_for("dashboard", transaction_error = "Sending or Recieving business doesn't exist"))
+
+
+        
 
 @app.route("/add_business", methods=['POST', 'GET'])
 def add_business():
@@ -313,15 +330,9 @@ def add_business():
     business_type = request.form.get("business_type")
     net_worth = request.form.get("net_worth")
 
-    conn = sql.connect("expensify.db")
-    curr = conn.cursor()    
+    Business.create(Business, owner_id=owner_id, business_type=business_type, business_name=business_name, net_worth=net_worth)
 
-    curr.execute("""INSERT INTO businesses (owner_id, business_name, business_type, net_worth) VALUES (?,?,?,?)""", (owner_id, business_name, business_type, net_worth))
-
-    conn.commit()
-    conn.close()
-
-    return overview()
+    return redirect(url_for("overview"))
 
 if __name__ == "__main__":
     app.run(debug=True)
