@@ -278,7 +278,9 @@ def overview():
 
     name = User.get_user_by_id(User, user_id).name
 
-    return render_template("overview.html", username = name)
+    add_business_error = request.args.get("add_business_error")
+
+    return render_template("overview.html", username = name, add_business_error=add_business_error)
     
 
 @app.route("/add_transaction", methods=['POST','GET'])
@@ -328,11 +330,26 @@ def add_business():
     owner_id = session["user_id"]
     business_name = request.form.get("business_name")
     business_type = request.form.get("business_type")
-    net_worth = request.form.get("net_worth")
+    net_worth = float(request.form.get("net_worth"))
 
-    Business.create(Business, owner_id=owner_id, business_type=business_type, business_name=business_name, net_worth=net_worth)
+    business_list = db.execute("SELECT business_name FROM businesses WHERE owner_id=?", (owner_id,), fetchall=True)
+    is_in_use = False
 
-    return redirect(url_for("overview"))
+    for business in business_list:
+        if business[0] == business_name:
+            is_in_use = True
+
+    if not is_in_use:
+        if net_worth >= 0:
+            Business.create(Business, owner_id=owner_id, business_type=business_type, business_name=business_name, net_worth=net_worth)
+            return redirect(url_for("overview"))
+        else:
+            return redirect(url_for("overview", add_business_error = "can't add business with negative net worth"))
+    else:
+        return redirect(url_for("overview", add_business_error = "this name is already in use!"))
+
+
+    
 
 if __name__ == "__main__":
     app.run(debug=True)
