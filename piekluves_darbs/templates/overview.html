@@ -25,6 +25,9 @@
                         <div class="card p-4 shadow-lg col-md-4" >
                             <form action="add_business" method="POST">
                                 <h2>add business</h2>
+                                {% if add_business_error %}
+                                    <div class="alert alert-danger">{{ add_business_error }}</div>
+                                {% endif %}
                                 <div class="mb-3">
                                     <label for="business_name" class="form-label text-start d-block">name</label>
                                     <input type="text" class="form-control" id="business_name" name="business_name" required>
